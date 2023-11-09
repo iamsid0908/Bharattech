@@ -8,7 +8,8 @@ class User(AbstractUser):
     password=models.CharField(max_length=255)
     mobile=models.CharField(max_length=10,default="")
     otp=models.BooleanField(default=False)
-    username=None
+    username = ""
+
     
     USERNAME_FIELD='email'
     REQUIRED_FIELDS=[]
