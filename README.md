@@ -18,8 +18,9 @@ output
 
 FOR LOGIN  [POST]
 
-/api/login/
+`/api/login/`
 
+Input
 `{
      "email":"newq@gmail.com",
     "password":"qwerty"
