@@ -21,6 +21,7 @@ class RegisterView(APIView):
         serializer = UserSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        
         return Response(serializer.data)
     
 class LoginView(APIView):
@@ -82,9 +83,7 @@ class RandomView(APIView):
     # In this example, we'll just return the OTP as a JSON response
         return JsonResponse({'otp': otp})
     
-    
-    
-    
+ 
 class ForgotPass(APIView):
     def post(self,request):
         try:
