@@ -23,13 +23,12 @@ class RegisterView(APIView):
         serializer.save()
         return Response(serializer.data)
     
-class LoginView(APIView):
+"""class LoginView(APIView):
     def post(self,request):
         email=request.data['email']
         password=request.data['password']
         
         user=User.objects.filter(email=email).first()
-        print(user)
         if user is None:
             raise AuthenticationFailed('user not found')
         
@@ -38,11 +37,11 @@ class LoginView(APIView):
         
         payload = {
             'id':user.id,
-            'exp':datetime.datetime.utcnow() + datetime.timedelta(minutes=1),
+            'exp':datetime.datetime.utcnow() + datetime.timedelta(minutes=60),
             'iat':datetime.datetime.utcnow()
             }
         
-        token = jwt.encode(payload, 'secret', algorithm='HS256').decode('utf-8')
+        token = jwt.encode(payload, 'secret', algorithm='HS256').encode('utf-8')
         response = Response()
         
         response.set_cookie(key='jwt', value=token, httponly=True)
@@ -50,25 +49,76 @@ class LoginView(APIView):
         response.data = {
             'jwt':token
         }
+        return response"""
+        
+        
+class LoginView(APIView):
+    def post(self, request):
+        email = request.data['email']
+        password = request.data['password']
+        
+        user = User.objects.filter(email=email).first()
+        if user is None:
+            raise AuthenticationFailed('User not found')
+        
+        if not user.check_password(password):
+            raise AuthenticationFailed("Incorrect password")
+        
+        payload = {
+            'id': user.id,
+            'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=30),
+            'iat': datetime.datetime.utcnow()
+        }
+        
+        token = jwt.encode(payload, 'secret', algorithm='HS256')
+        response = Response()
+        
+        response.set_cookie(key='jwt', value=token, httponly=True)
+        
+        response.data = {
+            'jwt': token
+        }
         return response
+
     
-    
-class UserView(APIView):
+"""class UserView(APIView):
     def get(self,request):
         token = request.COOKIES.get('jwt')
-        print(token)
         
         if not token:
             raise AuthenticationFailed("Incorrect password")
         
         try:
-            payload = jwt.decode(token,'secret',algorithms=['HS256'])
+            payload = jwt.decode(token,'secret',algorithms=['HS256']).decode("ut")
         except jwt.ExpiredSignatureError:
             raise AuthenticationFailed("Incorrect password")
         
         user = User.objects.filter(id=payload['id']).first()
         serializer = UserSerializer(user)
-        return Response(serializer.data)
+        return Response(serializer.data)"""
+    
+
+class UserView(APIView):
+    def get(self, request):
+        token = request.COOKIES.get('jwt')
+        
+        if not token:
+            raise AuthenticationFailed("Token not provided")
+        
+        try:
+            payload = jwt.decode(token, 'secret', algorithms=['HS256'])
+        except jwt.ExpiredSignatureError:
+            raise AuthenticationFailed("Token expired")
+        except jwt.DecodeError:
+            raise AuthenticationFailed("Invalid token")
+        
+        user = User.objects.filter(id=payload['id']).first()
+        
+        if not user:
+            raise AuthenticationFailed("User not found")
+        
+        serializer = UserSerializer(user)
+        return Response(serializer.data)    
     
     
 class RandomView(APIView):
@@ -110,13 +160,12 @@ class Otp_sent(APIView):
             # Generate a random OTP
             totp = pyotp.TOTP(pyotp.random_base32(), interval=300)
             otp = totp.now()
-
+            
                 # Store OTP in the session
             request.session['otp'] = otp
             print(otp)
-
+            
                 # Send the OTP to the user (e.g., via SMS or email)
-
             return JsonResponse({'message': 'OTP sent successfully'})
         except Exception as e:
             print(e)
@@ -136,4 +185,61 @@ class Otp_varify(APIView):
         except Exception as e:
             print(e)
 
-    
+
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from twilio.rest import Client
+import random
+
+class whatsapp(APIView):
+    def post(self, request):
+        mobile = request.data.get("mobile")
+        if not mobile:
+            return Response({"error": "Please provide a mobile number"}, status=400)
+
+        account_sid = 'AC496909bfd3cc0785577c3d3d7f6fb1b1'
+        auth_token = 'be798b50dfa267884c5a38805f47bbf2'
+        twilio_number = '+14155238886'  
+
+        client = Client(account_sid, auth_token)
+        otp_code = ''.join(random.choices('0123456789', k=6))  
+
+        message = client.messages.create(
+            body=f"Your OTP is: {otp_code}",
+            from_= "whatsapp:" + twilio_number,
+            to= "whatsapp:" + mobile,
+        )
+        
+        """message = client.messages.create(
+            body=f"Your OTP is: {otp_code}",
+            from_=  twilio_number,
+            to=  mobile,
+        )"""
+        print(otp_code)
+        return Response({"message_sid": message.sid})
+        
+        
+        
+class sms(APIView):
+    def post(self, request):
+        mobile = request.data.get("mobile")
+        if not mobile:
+            return Response({"error": "Please provide a mobile number"}, status=400)
+
+        account_sid = 'AC496909bfd3cc0785577c3d3d7f6fb1b1'
+        auth_token = 'be798b50dfa267884c5a38805f47bbf2'
+        twilio_number = '+12056070858'  
+
+        client = Client(account_sid, auth_token)
+        otp_code = ''.join(random.choices('0123456789', k=6))  
+
+        message = client.messages.create(
+            body=f"Your OTP is: {otp_code}",
+            from_=  twilio_number,
+            to=  mobile,
+        )
+        print(otp_code)
+        return Response({"message_sid": message.sid})
+        
+        
+        
