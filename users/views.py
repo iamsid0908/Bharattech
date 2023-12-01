@@ -6,9 +6,10 @@ from rest_framework.exceptions import AuthenticationFailed
 import jwt,datetime
 import random
 from django.http import JsonResponse
-from .helpers import send_forgot_email
+from .helpers import send_otp_email, send_forgot_email
 import uuid
 import pyotp
+from rest_framework import generics, status
 
 
 
@@ -123,13 +124,7 @@ class UserView(APIView):
     
 class RandomView(APIView):
     def get(self,request):
-    # Generate a random 4-digit OTP
         otp = ''.join(random.choice('0123456789') for _ in range(4))
-
-    # You can save this OTP to the user's profile or session for later use
-    # For example, request.session['otp'] = otp
-
-    # In this example, we'll just return the OTP as a JSON response
         return JsonResponse({'otp': otp})
     
     
@@ -154,21 +149,32 @@ class ForgotPass(APIView):
         
         
 class Otp_sent(APIView):
-    def get(self,request):
+    def get(self, request):
         try:
-        
             # Generate a random OTP
             totp = pyotp.TOTP(pyotp.random_base32(), interval=300)
             otp = totp.now()
             
-                # Store OTP in the session
+            # Store OTP in the session
             request.session['otp'] = otp
             print(otp)
             
-                # Send the OTP to the user (e.g., via SMS or email)
-            return JsonResponse({'message': 'OTP sent successfully'})
-        except Exception as e:
-            print(e)
+            email = request.data.get('email') 
+                    
+            if not User.objects.filter(email=email).exists():
+                return JsonResponse({"message": "User not found with this email"})
+                    
+            user_obj = User.objects.get(email=email)
+            print(user_obj)
+            
+            
+            send_otp_email(user_obj, otp)  
+            
+            return JsonResponse({"message": "OTP has been sent via message"})
+                
+        except jwt.ExpiredSignatureError:
+            raise AuthenticationFailed("Incorrect password")
+
             
             
 class Otp_varify(APIView):
@@ -198,7 +204,7 @@ class whatsapp(APIView):
             return Response({"error": "Please provide a mobile number"}, status=400)
 
         account_sid = 'AC496909bfd3cc0785577c3d3d7f6fb1b1'
-        auth_token = 'be798b50dfa267884c5a38805f47bbf2'
+        auth_token = 'f09cb0317bcd69f196b93d1177bea11b'
         twilio_number = '+14155238886'  
 
         client = Client(account_sid, auth_token)
@@ -242,4 +248,21 @@ class sms(APIView):
         return Response({"message_sid": message.sid})
         
         
-        
+from rest_framework import generics
+from .models import Challenges
+from .serializers import ChallengesSerializer
+
+class ChallengesCreateAPIView(generics.CreateAPIView):
+    queryset = Challenges.objects.all()
+    serializer_class = ChallengesSerializer
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def perform_create(self, serializer):
+        serializer.save()
+    
